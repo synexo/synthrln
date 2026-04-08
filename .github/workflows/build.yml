@@ -7,6 +7,7 @@ on:
     branches: [ main ]
   release:
     types: [ created ]
+  workflow_dispatch: # Allows manual runs
 
 jobs:
   # ==========================================================================
@@ -164,7 +165,10 @@ jobs:
   # ==========================================================================
   release:
     name: Create Release Bundle
-    if: github.event_name == 'release'
+    if: |
+      github.event_name == 'release' || 
+      github.event_name == 'push' || 
+      github.event_name == 'workflow_dispatch'
     needs:
       - build-linux-gcc
       - build-windows-mingw
@@ -187,28 +191,50 @@ jobs:
           name: synthrln-windows-x86_64
           path: dist/windows/
 
+      - name: Download Windows (MSVC) artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: synthrln-windows-msvc-x86_64
+          path: dist/windows-msvc/
+   
       - name: Bundle with config example and docs
         run: |
-          VERSION=${{ github.event.release.tag_name }}
+          VERSION="${{ github.event.release.tag_name }}"
+          if [ -z "$VERSION" ]; then VERSION="${{ github.ref_name }}"; fi
+          mkdir -p release
 
-          # Linux bundle
+          # --- Linux Bundle ---
           mkdir -p release/synthrln-${VERSION}-linux-x86_64
           cp dist/linux/synthrln release/synthrln-${VERSION}-linux-x86_64/
           cp synthrln.cfg.example release/synthrln-${VERSION}-linux-x86_64/
           cp README.md release/synthrln-${VERSION}-linux-x86_64/
           chmod +x release/synthrln-${VERSION}-linux-x86_64/synthrln
-          tar -czf release/synthrln-${VERSION}-linux-x86_64.tar.gz \
-            -C release synthrln-${VERSION}-linux-x86_64
+          tar -czf release/synthrln-${VERSION}-linux-x86_64.tar.gz -C release synthrln-${VERSION}-linux-x86_64
 
-          # Windows bundle
-          mkdir -p release/synthrln-${VERSION}-windows-x86_64
-          cp dist/windows/synthrln.exe release/synthrln-${VERSION}-windows-x86_64/
-          cp synthrln.cfg.example release/synthrln-${VERSION}-windows-x86_64/SYNTHRLN.CFG.EXAMPLE
-          cp README.md release/synthrln-${VERSION}-windows-x86_64/
-          zip -j release/synthrln-${VERSION}-windows-x86_64.zip \
-            release/synthrln-${VERSION}-windows-x86_64/*
+          # --- Windows (MinGW) Bundle ---
+          mkdir -p release/synthrln-${VERSION}-windows-x86_64-mingw
+          cp dist/windows/synthrln.exe release/synthrln-${VERSION}-windows-x86_64-mingw/
+          cp synthrln.cfg.example release/synthrln-${VERSION}-windows-x86_64-mingw/SYNTHRLN.CFG.EXAMPLE
+          cp README.md release/synthrln-${VERSION}-windows-x86_64-mingw/
+          zip -j release/synthrln-${VERSION}-windows-x86_64-mingw.zip release/synthrln-${VERSION}-windows-x86_64-mingw/*
 
-      - name: Upload release assets
+          # --- Windows (MSVC) Bundle ---
+          mkdir -p release/synthrln-${VERSION}-windows-x86_64-msvc
+          cp dist/windows-msvc/synthrln.exe release/synthrln-${VERSION}-windows-x86_64-msvc/
+          cp synthrln.cfg.example release/synthrln-${VERSION}-windows-x86_64-msvc/SYNTHRLN.CFG.EXAMPLE
+          cp README.md release/synthrln-${VERSION}-windows-x86_64-msvc/
+          zip -j release/synthrln-${VERSION}-windows-x86_64-msvc.zip release/synthrln-${VERSION}-windows-x86_64-msvc/*
+
+      # This makes the files downloadable from the "Summary" page of the Action
+      - name: Upload Bundled Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: synthrln-final-bundles
+          path: release/
+
+      # This ONLY runs if you actually created a Release on GitHub
+      - name: Upload to GitHub Release
+        if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
           files: |
