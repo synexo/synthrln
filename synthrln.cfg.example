@@ -1,0 +1,65 @@
+# SYNTHRLN.CFG - Example Configuration File
+# Copy this file to synthrln.cfg and edit as needed.
+# Lines beginning with # are comments.
+# Key = Value  (keys are case-insensitive, whitespace around = is ignored)
+
+# ============================================================================
+# Dropfile Settings
+# ============================================================================
+
+# Type of dropfile the BBS writes:
+#   DOOR32   - DOOR32.SYS  (Windows/Linux BBS software; Synchronet, mystic, etc.)
+#   DORINFO1 - DORINFO1.DEF (DOS BBS software; TBBS, RBBS, RemoteAccess, etc.)
+DropfileType = DOOR32
+
+# Full path to the dropfile.
+# Windows example: C:\BBS\NODE1\DOOR32.SYS
+# Linux example:   /bbs/nodes/node1/door32.sys
+DropfilePath = /bbs/nodes/node1/door32.sys
+
+# ============================================================================
+# Connection Settings
+# ============================================================================
+
+# Protocol to use when connecting to the game server:
+#   RLOGIN - RFC 1282 rlogin (sends username/terminal handshake on connect)
+#   TELNET - Raw TCP / Telnet  (no handshake; IAC sequences filtered automatically)
+Protocol = RLOGIN
+
+# Target game server IP address or hostname
+Server = 192.168.1.100
+
+# Target TCP port
+# Default rlogin port: 513
+# Default telnet port: 23
+Port = 513
+
+# ============================================================================
+# Rlogin Handshake Mapping (only used when Protocol = RLOGIN)
+# ============================================================================
+# These settings control what SYNTHRLN sends in the rlogin handshake.
+# They map dropfile fields to rlogin client-user and server-user strings.
+#
+# Valid values:
+#   USERNAME  - The user's BBS alias/handle  (from dropfile)
+#   REALNAME  - The user's real name          (from dropfile)
+#   DOORNAME  - The BBS name / door name      (from dropfile)
+#   Or a literal string value.
+
+# What to send as the rlogin "client username" (who is connecting from)
+ClientUser = USERNAME
+
+# What to send as the rlogin "server username" (what door/game to launch)
+ServerUser = DOORNAME
+
+# Terminal type string for the rlogin handshake (e.g., ANSI, VT100, ANSI-BBS)
+TermType = ANSI
+
+# ============================================================================
+# Session Options
+# ============================================================================
+
+# RespectTime: Should SYNTHRLN disconnect when the user's BBS time runs out?
+#   TRUE  - Bridge disconnects when dropfile time limit expires
+#   FALSE - Bridge ignores the dropfile time limit (runs indefinitely)
+RespectTime = TRUE

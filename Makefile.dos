@@ -1,0 +1,80 @@
+# SYNTHRLN - DOS Build Makefile (OpenWatcom)
+# Usage: wmake /f Makefile.dos
+#
+# Requires:
+#   - OpenWatcom 2.0 (wcc386, wpp386, wlink)
+#   - mTCP library in vendor\mtcp\
+#   - WATCOM environment variable set to OpenWatcom install dir
+
+WATCOM_BIN = $(WATCOM)\BINNT
+
+CC     = $(WATCOM_BIN)\wcc386
+CPP    = $(WATCOM_BIN)\wpp386
+LINK   = $(WATCOM_BIN)\wlink
+
+CFLAGS = -bt=dos -mf -3r -fp3 -s -w3 -e25 -zq &
+         -I$(WATCOM)\H &
+         -Isrc &
+         -Ivendor\mtcp\include &
+         -D__MSDOS__ -D__WATCOMC__
+
+CPPFLAGS = $(CFLAGS)
+
+OUTDIR = build\dos
+
+OBJS = &
+    $(OUTDIR)\main.obj &
+    $(OUTDIR)\config.obj &
+    $(OUTDIR)\dropfile.obj &
+    $(OUTDIR)\bbs_fossil.obj &
+    $(OUTDIR)\bbs_local.obj &
+    $(OUTDIR)\net_mtcp.obj &
+    $(OUTDIR)\net_mtcp_wrap.obj
+
+MTCP_LIB = vendor\mtcp\lib\mtcplib.lib
+
+TARGET = $(OUTDIR)\SYNTHRLN.EXE
+
+all: $(OUTDIR) $(TARGET) .SYMBOLIC
+
+$(OUTDIR):
+    mkdir $(OUTDIR)
+
+$(TARGET): $(OBJS) $(MTCP_LIB)
+    $(LINK) system dos4g name $@ &
+        file $(OUTDIR)\main.obj &
+        file $(OUTDIR)\config.obj &
+        file $(OUTDIR)\dropfile.obj &
+        file $(OUTDIR)\bbs_fossil.obj &
+        file $(OUTDIR)\bbs_local.obj &
+        file $(OUTDIR)\net_mtcp.obj &
+        file $(OUTDIR)\net_mtcp_wrap.obj &
+        library $(MTCP_LIB)
+    @echo Built: $(TARGET)
+
+$(OUTDIR)\main.obj: src\main.c src\synthrln.h src\config.h src\dropfile.h src\bbs_io.h src\net_io.h
+    $(CC) $(CFLAGS) src\main.c -fo=$@
+
+$(OUTDIR)\config.obj: src\config.c src\synthrln.h src\config.h
+    $(CC) $(CFLAGS) src\config.c -fo=$@
+
+$(OUTDIR)\dropfile.obj: src\dropfile.c src\synthrln.h src\dropfile.h
+    $(CC) $(CFLAGS) src\dropfile.c -fo=$@
+
+$(OUTDIR)\bbs_fossil.obj: src\bbs_fossil.c src\synthrln.h src\bbs_io.h
+    $(CC) $(CFLAGS) src\bbs_fossil.c -fo=$@
+
+$(OUTDIR)\bbs_local.obj: src\bbs_local.c src\synthrln.h src\bbs_io.h
+    $(CC) $(CFLAGS) src\bbs_local.c -fo=$@
+
+$(OUTDIR)\net_mtcp.obj: src\net_mtcp.c src\net_io.h
+    $(CC) $(CFLAGS) src\net_mtcp.c -fo=$@
+
+$(OUTDIR)\net_mtcp_wrap.obj: src\net_mtcp_wrap.cpp
+    $(CPP) $(CPPFLAGS) src\net_mtcp_wrap.cpp -fo=$@
+
+clean: .SYMBOLIC
+    del /q $(OUTDIR)\*.obj 2>nul
+    del /q $(OUTDIR)\*.exe 2>nul
+    rmdir $(OUTDIR) 2>nul
+    @echo Cleaned.

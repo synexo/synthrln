@@ -1,0 +1,216 @@
+name: Build
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  release:
+    types: [ created ]
+
+jobs:
+  # ==========================================================================
+  # Linux native build (GCC + Clang)
+  # ==========================================================================
+  build-linux-gcc:
+    name: Linux (GCC)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y gcc cmake
+
+      - name: Configure (CMake)
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=gcc
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Verify binary
+        run: |
+          ./build/synthrln --help || true
+          file ./build/synthrln
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: synthrln-linux-x86_64-gcc
+          path: build/synthrln
+
+  build-linux-clang:
+    name: Linux (Clang)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y clang cmake
+
+      - name: Configure (CMake)
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=clang
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Verify binary
+        run: |
+          ./build/synthrln --help || true
+          file ./build/synthrln
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: synthrln-linux-x86_64-clang
+          path: build/synthrln
+
+  # ==========================================================================
+  # Windows build via MinGW cross-compilation
+  # ==========================================================================
+  build-windows-mingw:
+    name: Windows (MinGW cross-compile)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install MinGW-w64
+        run: sudo apt-get update && sudo apt-get install -y mingw-w64 cmake
+
+      - name: Configure (CMake with MinGW toolchain)
+        run: |
+          cmake -B build-win \
+            -DCMAKE_SYSTEM_NAME=Windows \
+            -DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc \
+            -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build-win --parallel
+
+      - name: Verify binary
+        run: file build-win/synthrln.exe
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: synthrln-windows-x86_64
+          path: build-win/synthrln.exe
+
+  # ==========================================================================
+  # Windows native build with MSVC
+  # ==========================================================================
+  build-windows-msvc:
+    name: Windows (MSVC)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure (CMake)
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --config Release --parallel
+
+      - name: Verify binary
+        run: .\build\Release\synthrln.exe --help
+        continue-on-error: true
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: synthrln-windows-msvc-x86_64
+          path: build/Release/synthrln.exe
+
+  # ==========================================================================
+  # Make-based Linux build (alternative to CMake)
+  # ==========================================================================
+  build-linux-make:
+    name: Linux (Makefile)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build with Make
+        run: make linux
+
+      - name: Verify binary
+        run: |
+          ./build/synthrln --help || true
+
+  # ==========================================================================
+  # Static analysis
+  # ==========================================================================
+  lint:
+    name: Static Analysis (cppcheck)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install cppcheck
+        run: sudo apt-get update && sudo apt-get install -y cppcheck
+
+      - name: Run cppcheck
+        run: |
+          cppcheck \
+            --enable=warning,style,performance,portability \
+            --std=c99 \
+            --error-exitcode=1 \
+            --suppress=missingIncludeSystem \
+            --suppress=missingInclude \
+            -DDEBUG \
+            src/
+
+  # ==========================================================================
+  # Release: bundle all artifacts
+  # ==========================================================================
+  release:
+    name: Create Release Bundle
+    if: github.event_name == 'release'
+    needs:
+      - build-linux-gcc
+      - build-windows-mingw
+      - build-windows-msvc
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Linux artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: synthrln-linux-x86_64-gcc
+          path: dist/linux/
+
+      - name: Download Windows (MinGW) artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: synthrln-windows-x86_64
+          path: dist/windows/
+
+      - name: Bundle with config example and docs
+        run: |
+          VERSION=${{ github.event.release.tag_name }}
+
+          # Linux bundle
+          mkdir -p release/synthrln-${VERSION}-linux-x86_64
+          cp dist/linux/synthrln release/synthrln-${VERSION}-linux-x86_64/
+          cp synthrln.cfg.example release/synthrln-${VERSION}-linux-x86_64/
+          cp README.md release/synthrln-${VERSION}-linux-x86_64/
+          chmod +x release/synthrln-${VERSION}-linux-x86_64/synthrln
+          tar -czf release/synthrln-${VERSION}-linux-x86_64.tar.gz \
+            -C release synthrln-${VERSION}-linux-x86_64
+
+          # Windows bundle
+          mkdir -p release/synthrln-${VERSION}-windows-x86_64
+          cp dist/windows/synthrln.exe release/synthrln-${VERSION}-windows-x86_64/
+          cp synthrln.cfg.example release/synthrln-${VERSION}-windows-x86_64/SYNTHRLN.CFG.EXAMPLE
+          cp README.md release/synthrln-${VERSION}-windows-x86_64/
+          zip -j release/synthrln-${VERSION}-windows-x86_64.zip \
+            release/synthrln-${VERSION}-windows-x86_64/*
+
+      - name: Upload release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release/*.tar.gz
+            release/*.zip

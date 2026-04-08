@@ -1,0 +1,51 @@
+# Build output
+build/
+build-win/
+build-debug/
+*.o
+*.obj
+*.exe
+synthrln
+
+# CMake
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+CPackConfig.cmake
+CPackSourceConfig.cmake
+install_manifest.txt
+*.cmake
+!CMakeLists.txt
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Local config (never commit real configs with IPs/paths)
+synthrln.cfg
+*.cfg
+!synthrln.cfg.example
+!SYNTHRLN.CFG.EXAMPLE
+
+# Dropfiles (never commit these - they contain user PII)
+DOOR32.SYS
+DORINFO1.DEF
+door32.sys
+dorinfo1.def
+*.sys
+*.def
+
+# mTCP vendor library (large binary, not redistributed here)
+vendor/mtcp/
+
+# Compilation database
+compile_commands.json
+
+# Logs and test artefacts
+*.log
+/tmp/
